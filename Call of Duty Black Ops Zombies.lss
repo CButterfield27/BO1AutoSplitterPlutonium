@@ -1,0 +1,33 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<Run version="1.7.0">
+  <GameIcon />
+  <GameName>Call of Duty: Black Ops Zombies</GameName>
+  <CategoryName>Der Riese</CategoryName>
+  <LayoutPath>C:\Users\Const\Desktop\Stuff\Gaming\B01 Auto Splitter\BO1 Layout.lsl</LayoutPath>
+  <Metadata>
+    <Run id="" />
+    <Platform usesEmulator="False">PC</Platform>
+    <Region>
+    </Region>
+    <Variables>
+      <Variable name="Number of Players">Solo</Variable>
+      <Variable name="Der Riese">Easter Egg (Fly Trap)</Variable>
+    </Variables>
+    <CustomVariables />
+  </Metadata>
+  <Offset>00:00:00</Offset>
+  <AttemptCount>0</AttemptCount>
+  <AttemptHistory />
+  <Segments>
+    <Segment>
+      <Name>Complete EE</Name>
+      <Icon />
+      <SplitTimes>
+        <SplitTime name="Personal Best" />
+      </SplitTimes>
+      <BestSegmentTime />
+      <SegmentHistory />
+    </Segment>
+  </Segments>
+  <AutoSplitterSettings />
+</Run>
