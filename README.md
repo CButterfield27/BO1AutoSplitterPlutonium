@@ -81,11 +81,12 @@ You can adjust these in the `startup` block:
 
 ## Usage
 
-1. Open LiveSplit.
-2. Load this `.asl` script in **Edit Layout** → **Add Control** → **Add Control** → **Scriptable Auto Splitter** → **Add B01 Auto Splitter (plutonium).asl**.
-3. Ensure the game is running through Plutonium.
-4. The script will automatically start, pause, unpause, stop, and reset as you play.
-5. You will need to split manually.
+1. Download the .zip file **Green Code Button** → **Download .zip**
+2. Open LiveSplit.
+3. Load this `.asl` script in **Edit Layout** → **Add Control** → **Add Control** → **Scriptable Auto Splitter** → **Add B01 Auto Splitter (plutonium).asl**.
+4. Ensure the game is running through Plutonium.
+5. The script will automatically start, pause, unpause, stop, and reset as you play.
+6. You will need to split manually.
 
 ---
 
