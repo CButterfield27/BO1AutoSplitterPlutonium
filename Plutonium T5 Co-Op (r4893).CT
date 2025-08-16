@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<CheatTable CheatEngineTableVersion="46">
+  <CheatEntries>
+    <CheatEntry>
+      <ID>9</ID>
+      <Description>"menu_state"</Description>
+      <VariableType>4 Bytes</VariableType>
+      <Address>"plutonium-bootstrapper-win32.exe"+7CB530</Address>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>3</ID>
+      <Description>"timer"</Description>
+      <VariableType>4 Bytes</VariableType>
+      <Address>"plutonium-bootstrapper-win32.exe"+168A37C</Address>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>11</ID>
+      <Description>"game_paused"</Description>
+      <VariableType>4 Bytes</VariableType>
+      <Address>"plutonium-bootstrapper-win32.exe"+216BFD0</Address>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>7</ID>
+      <Description>"health"</Description>
+      <VariableType>4 Bytes</VariableType>
+      <Address>"plutonium-bootstrapper-win32.exe"+167987C</Address>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>8</ID>
+      <Description>"dead"</Description>
+      <VariableType>4 Bytes</VariableType>
+      <Address>"plutonium-bootstrapper-win32.exe"+1656C38</Address>
+    </CheatEntry>
+  </CheatEntries>
+  <UserdefinedSymbols/>
+</CheatTable>
