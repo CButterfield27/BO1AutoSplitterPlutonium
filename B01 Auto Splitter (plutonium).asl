@@ -23,41 +23,21 @@ init { refreshRate = 20; }
 startup
 {
     // ---- Tunables ----
-    // Start once in-game timer >= threshold (default 50, range 0–200)
-    settings.Add("T_START_THRESHOLD", 50);
-    vars.T_START_THRESHOLD = (int)settings["T_START_THRESHOLD"];
+    vars.T_START_THRESHOLD       = 50;   // start once in-game timer >= 50 (~2.5s @ ~20/s)
+    vars.T_RESET_SMALL           = 100;  // "fresh" timer threshold for menu-based detection
+    vars.T_RESET_CONFIRM_TICKS   = 20;   // ~1s 20 Hz (menu-based fresh-game arm)
 
-    // "Fresh" timer threshold for menu-based detection (default 100, range 0–200)
-    settings.Add("T_RESET_SMALL", 100);
-    vars.T_RESET_SMALL = (int)settings["T_RESET_SMALL"];
+    vars.PauseConfirmTicks       = 3;    // debounce explicit pause
+    vars.UnpauseConfirmTicks     = 3;    // debounce explicit unpause
 
-    // ~1s @ 20 Hz confirmation window for a fresh game (default 20, range 1–200)
-    settings.Add("T_RESET_CONFIRM_TICKS", 20);
-    vars.T_RESET_CONFIRM_TICKS = (int)settings["T_RESET_CONFIRM_TICKS"];
-
-    // Debounce explicit pause/unpause (defaults 3, range 0–20)
-    settings.Add("PauseConfirmTicks", 3);
-    vars.PauseConfirmTicks = (int)settings["PauseConfirmTicks"];
-    settings.Add("UnpauseConfirmTicks", 3);
-    vars.UnpauseConfirmTicks = (int)settings["UnpauseConfirmTicks"];
-
-    // Death handling debounce (defaults 5, range 0–50)
-    settings.Add("DeathConfirmTicks", 5);
-    vars.DeathConfirmTicks = (int)settings["DeathConfirmTicks"];
-    settings.Add("AliveConfirmTicks", 5);
-    vars.AliveConfirmTicks = (int)settings["AliveConfirmTicks"];
+    // Death handling (debounce)
+    vars.DeathConfirmTicks       = 5;    // ~250ms to confirm death
+    vars.AliveConfirmTicks       = 5;    // ~250ms alive confirm before allowing new start
 
     // Stall-based pause (kept OFF for better pause behavior)
-    settings.AddBool("UseStallPause", false); // enable stall-based pause detection (default off)
-    vars.UseStallPause = (bool)settings["UseStallPause"];
-
-    // Pause when timer stalls (default 3 ticks, range 1–50)
-    settings.Add("T_TIMER_STALL_TICKS", 3);
-    vars.T_TIMER_STALL_TICKS = (int)settings["T_TIMER_STALL_TICKS"];
-
-    // Resume after stall when timer advances (default 2 ticks, range 1–50)
-    settings.Add("T_RESUME_TICKS", 2);
-    vars.T_RESUME_TICKS = (int)settings["T_RESUME_TICKS"];
+    vars.UseStallPause           = false;
+    vars.T_TIMER_STALL_TICKS     = 3;
+    vars.T_RESUME_TICKS          = 2;
 
     // ---- Timer model + flags ----
     vars.timerModel = new TimerModel { CurrentState = timer };
