@@ -20,14 +20,25 @@ state("plutonium-bootstrapper-win32")
 
 init { refreshRate = 20; }
 
+settings
+{
+    // ---- Tunables ----
+    "T_START_THRESHOLD"     : 50
+    "T_RESET_SMALL"         : 100
+    "PauseConfirmTicks"     : 3
+    "UseStallPause"         : false
+    "T_TIMER_STALL_TICKS"   : 3
+    "T_RESUME_TICKS"        : 2
+}
+
 startup
 {
     // ---- Tunables ----
-    vars.T_START_THRESHOLD       = 50;   // start once in-game timer >= 50 (~2.5s @ ~20/s)
-    vars.T_RESET_SMALL           = 100;  // "fresh" timer threshold for menu-based detection
+    vars.T_START_THRESHOLD       = (int)settings["T_START_THRESHOLD"];     // start once in-game timer >= 50 (~2.5s @ ~20/s)
+    vars.T_RESET_SMALL           = (int)settings["T_RESET_SMALL"];         // "fresh" timer threshold for menu-based detection
     vars.T_RESET_CONFIRM_TICKS   = 20;   // ~1s 20 Hz (menu-based fresh-game arm)
 
-    vars.PauseConfirmTicks       = 3;    // debounce explicit pause
+    vars.PauseConfirmTicks       = (int)settings["PauseConfirmTicks"];     // debounce explicit pause
     vars.UnpauseConfirmTicks     = 3;    // debounce explicit unpause
 
     // Death handling (debounce)
@@ -35,9 +46,9 @@ startup
     vars.AliveConfirmTicks       = 5;    // ~250ms alive confirm before allowing new start
 
     // Stall-based pause (kept OFF for better pause behavior)
-    vars.UseStallPause           = false;
-    vars.T_TIMER_STALL_TICKS     = 3;
-    vars.T_RESUME_TICKS          = 2;
+    vars.UseStallPause           = (bool)settings["UseStallPause"];
+    vars.T_TIMER_STALL_TICKS     = (int)settings["T_TIMER_STALL_TICKS"];
+    vars.T_RESUME_TICKS          = (int)settings["T_RESUME_TICKS"];
 
     // ---- Timer model + flags ----
     vars.timerModel = new TimerModel { CurrentState = timer };
