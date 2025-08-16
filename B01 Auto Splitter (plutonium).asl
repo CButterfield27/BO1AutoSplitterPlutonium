@@ -23,41 +23,21 @@ init { refreshRate = 20; }
 startup
 {
     // ---- Tunables ----
-    // Start once in-game timer >= value (~2.5s @ ~20/s)
-    settings.AddInt("T_START_THRESHOLD", 50, "Start threshold");
-    vars.T_START_THRESHOLD = (int)settings["T_START_THRESHOLD"];
+    vars.T_START_THRESHOLD       = 50;   // start once in-game timer >= 50 (~2.5s @ ~20/s)
+    vars.T_RESET_SMALL           = 100;  // "fresh" timer threshold for menu-based detection
+    vars.T_RESET_CONFIRM_TICKS   = 20;   // ~1s 20 Hz (menu-based fresh-game arm)
 
-    // "Fresh" timer threshold for menu-based detection
-    settings.AddInt("T_RESET_SMALL", 100, "Fresh timer threshold");
-    vars.T_RESET_SMALL = (int)settings["T_RESET_SMALL"];
+    vars.PauseConfirmTicks       = 3;    // debounce explicit pause
+    vars.UnpauseConfirmTicks     = 3;    // debounce explicit unpause
 
-    // ~1s @20Hz (menu-based fresh-game arm)
-    settings.AddInt("T_RESET_CONFIRM_TICKS", 20, "Fresh-game confirm ticks");
-    vars.T_RESET_CONFIRM_TICKS = (int)settings["T_RESET_CONFIRM_TICKS"];
+    // Death handling (debounce)
+    vars.DeathConfirmTicks       = 5;    // ~250ms to confirm death
+    vars.AliveConfirmTicks       = 5;    // ~250ms alive confirm before allowing new start
 
-    // Debounce explicit pause/unpause
-    settings.AddInt("PauseConfirmTicks", 3, "Pause debounce ticks");
-    vars.PauseConfirmTicks = (int)settings["PauseConfirmTicks"];
-
-    settings.AddInt("UnpauseConfirmTicks", 3, "Unpause debounce ticks");
-    vars.UnpauseConfirmTicks = (int)settings["UnpauseConfirmTicks"];
-
-    // Death handling (debounce) ~250ms @20Hz
-    settings.AddInt("DeathConfirmTicks", 5, "Death confirm ticks");
-    vars.DeathConfirmTicks = (int)settings["DeathConfirmTicks"];
-
-    settings.AddInt("AliveConfirmTicks", 5, "Alive confirm ticks");
-    vars.AliveConfirmTicks = (int)settings["AliveConfirmTicks"];
-
-    // Stall-based pause detection
-    settings.AddBool("UseStallPause", false, "Enable stall-based pause");
-    vars.UseStallPause = (bool)settings["UseStallPause"];
-
-    settings.AddInt("T_TIMER_STALL_TICKS", 3, "Timer stall ticks");
-    vars.T_TIMER_STALL_TICKS = (int)settings["T_TIMER_STALL_TICKS"];
-
-    settings.AddInt("T_RESUME_TICKS", 2, "Resume ticks after stall");
-    vars.T_RESUME_TICKS = (int)settings["T_RESUME_TICKS"];
+    // Stall-based pause (kept OFF for better pause behavior)
+    vars.UseStallPause           = false;
+    vars.T_TIMER_STALL_TICKS     = 3;
+    vars.T_RESUME_TICKS          = 2;
 
     // ---- Timer model + flags ----
     vars.timerModel = new TimerModel { CurrentState = timer };
@@ -88,9 +68,9 @@ startup
 
     // ---- Map alive/death codes ----
     // Alive values across maps
-    vars.AliveVals = new HashSet<int> { 0, 7, 129 };
+    vars.AliveVals = new List<int> { 0, 7, 129 };
     // Dead values across maps
-    vars.DeadVals  = new HashSet<int> { 5, 25, 26 };
+    vars.DeadVals  = new List<int> { 5, 25, 26 };
 }
 
 // Start — only when alive, in gameplay, and timer is moving
@@ -114,33 +94,30 @@ start
 // Base script: no splits
 split { return false; }
 
-void ClearLocalState()
-{
-    vars.timer_started = false;
-    vars.is_paused = false;
-
-    vars.timer_value = 0;
-    vars.timer_pause_length = 0;
-
-    vars.pauseHold = vars.unpauseHold = 0;
-    vars.stallTicks = vars.resumeTicks = 0;
-    vars.stallPauseActive = false;
-
-    // Keep aliveStableTicks/blockStartUntilAlive as-is
-    vars.deathStableTicks = 0;
-    vars.freshGameConfirmTicks = 0;
-
-    vars.pendingReset = false;
-    vars.did_reset = true;
-    vars.hasStoppedOnce = false;
-}
-
 // Reset — executes only when update() sets vars.pendingReset (menu/death path)
 reset
 {
     if (vars.pendingReset)
     {
-        ClearLocalState();
+        // Clear local state
+        vars.timer_started = false;
+        vars.is_paused = false;
+
+        vars.timer_value = 0;
+        vars.timer_pause_length = 0;
+
+        vars.pauseHold = vars.unpauseHold = 0;
+        vars.stallTicks = vars.resumeTicks = 0;
+        vars.stallPauseActive = false;
+
+        // Keep aliveStableTicks/blockStartUntilAlive (death path) as-is;
+        // we want to require a stable alive state before re-starting.
+        vars.deathStableTicks = 0;
+        vars.freshGameConfirmTicks = 0;
+
+        vars.pendingReset = false;
+        vars.did_reset = true;
+        vars.hasStoppedOnce = false;
         return true;
     }
 
@@ -155,20 +132,7 @@ update
 {
     bool toggledThisTick = false;
 
-    TrackAliveStability();
-    HandleExplicitPause(ref toggledThisTick);
-    HandleStallPause(ref toggledThisTick);
-    HandleMenuExit();
-    HandleDeathReset();
-    HandleHardRestart();
-    HandleFreshGameReset();
-    UpdatePauseStrippedClock();
-
-    return true;
-}
-
-void TrackAliveStability()
-{
+    // 0) Track alive stability to clear start-block after death
     if (vars.AliveVals.Contains(current.dead))
     {
         vars.aliveStableTicks++;
@@ -179,67 +143,61 @@ void TrackAliveStability()
     {
         vars.aliveStableTicks = 0;
     }
-}
 
-void HandleExplicitPause(ref bool toggledThisTick)
-{
-    if (!vars.timer_started) return;
-
-    bool gameIsPaused = (current.game_paused > 0);
-
-    if (gameIsPaused) { vars.pauseHold++;  vars.unpauseHold = 0; }
-    else              { vars.unpauseHold++; vars.pauseHold  = 0; }
-
-    if (!vars.is_paused && vars.pauseHold >= vars.PauseConfirmTicks)
+    // 1) Debounced pause/unpause from explicit pause flag (>0 = paused)
+    if (vars.timer_started)
     {
-        vars.timerModel.Pause(); // ON
-        vars.is_paused = true;
-        vars.stallPauseActive = false;
-        vars.stallTicks = vars.resumeTicks = 0;
-        toggledThisTick = true;
-    }
+        bool gameIsPaused = (current.game_paused > 0);
 
-    if (!toggledThisTick && vars.is_paused && !vars.stallPauseActive &&
-        vars.unpauseHold >= vars.UnpauseConfirmTicks)
-    {
-        vars.timerModel.Pause(); // OFF
-        vars.is_paused = false;
-        toggledThisTick = true;
-    }
-}
+        if (gameIsPaused) { vars.pauseHold++;  vars.unpauseHold = 0; }
+        else              { vars.unpauseHold++; vars.pauseHold  = 0; }
 
-void HandleStallPause(ref bool toggledThisTick)
-{
-    if (!vars.UseStallPause || !vars.timer_started || toggledThisTick || current.game_paused != 0)
-        return;
+        if (!vars.is_paused && vars.pauseHold >= vars.PauseConfirmTicks)
+        {
+            vars.timerModel.Pause(); // ON
+            vars.is_paused = true;
+            vars.stallPauseActive = false;
+            vars.stallTicks = vars.resumeTicks = 0;
+            toggledThisTick = true;
+        }
 
-    if (current.timer <= old.timer) vars.stallTicks++;
-    else { vars.stallTicks = 0; vars.resumeTicks = 0; }
-
-    if (!vars.is_paused && vars.stallTicks >= vars.T_TIMER_STALL_TICKS)
-    {
-        vars.timerModel.Pause(); // ON
-        vars.is_paused = true;
-        vars.stallPauseActive = true;
-        vars.resumeTicks = 0;
-        toggledThisTick = true;
-    }
-
-    if (!toggledThisTick && vars.is_paused && vars.stallPauseActive && current.timer > old.timer)
-    {
-        vars.resumeTicks++;
-        if (vars.resumeTicks >= vars.T_RESUME_TICKS)
+        if (!toggledThisTick && vars.is_paused && !vars.stallPauseActive &&
+            vars.unpauseHold >= vars.UnpauseConfirmTicks)
         {
             vars.timerModel.Pause(); // OFF
             vars.is_paused = false;
-            vars.stallPauseActive = false;
-            vars.stallTicks = vars.resumeTicks = 0;
+            toggledThisTick = true;
         }
     }
-}
 
-void HandleMenuExit()
-{
+    // 2) stall-based pause (off unless enabled)
+    if (vars.UseStallPause && vars.timer_started && !toggledThisTick && (current.game_paused == 0))
+    {
+        if (current.timer <= old.timer) vars.stallTicks++; else { vars.stallTicks = 0; vars.resumeTicks = 0; }
+
+        if (!vars.is_paused && vars.stallTicks >= vars.T_TIMER_STALL_TICKS)
+        {
+            vars.timerModel.Pause(); // ON
+            vars.is_paused = true;
+            vars.stallPauseActive = true;
+            vars.resumeTicks = 0;
+            toggledThisTick = true;
+        }
+
+        if (!toggledThisTick && vars.is_paused && vars.stallPauseActive && current.timer > old.timer)
+        {
+            vars.resumeTicks++;
+            if (vars.resumeTicks >= vars.T_RESUME_TICKS)
+            {
+                vars.timerModel.Pause(); // OFF
+                vars.is_paused = false;
+                vars.stallPauseActive = false;
+                vars.stallTicks = vars.resumeTicks = 0;
+            }
+        }
+    }
+
+    // 3) Stop on leaving gameplay (menu_state != 0) → pause + queued reset
     if (vars.timer_started && current.menu_state != 0)
     {
         if (!vars.is_paused) { vars.timerModel.Pause(); vars.is_paused = true; } // freeze immediately
@@ -248,45 +206,48 @@ void HandleMenuExit()
         vars.pendingReset = true;   // reset via reset{} next tick
         vars.pauseHold = vars.unpauseHold = 0;
     }
-}
 
-void HandleDeathReset()
-{
-    if (!vars.timer_started) return;
-
-    bool isDeadNow = vars.DeadVals.Contains(current.dead);
-    if (isDeadNow) vars.deathStableTicks++; else vars.deathStableTicks = 0;
-
-    if (vars.deathStableTicks >= vars.DeathConfirmTicks)
+    // 4) Stop on death → pause + queued reset; block starts until alive confirmed
+    if (vars.timer_started)
     {
-        if (!vars.is_paused) { vars.timerModel.Pause(); vars.is_paused = true; } // freeze immediately
-        vars.timer_started = false;
-        vars.hasStoppedOnce = true;
-        vars.pendingReset = true; // reset via reset{}
-        vars.deathStableTicks = 0;
-        vars.pauseHold = vars.unpauseHold = 0;
+        bool isDeadNow = vars.DeadVals.Contains(current.dead);
+        if (isDeadNow) vars.deathStableTicks++; else vars.deathStableTicks = 0;
 
-        vars.blockStartUntilAlive = true; // don't allow start until alive again
-        vars.aliveStableTicks = 0;
+        if (vars.deathStableTicks >= vars.DeathConfirmTicks)
+        {
+            if (!vars.is_paused) { vars.timerModel.Pause(); vars.is_paused = true; } // freeze immediately
+            vars.timer_started = false;
+            vars.hasStoppedOnce = true;
+            vars.pendingReset = true; // reset via reset{}
+            vars.deathStableTicks = 0;
+            vars.pauseHold = vars.unpauseHold = 0;
+
+            vars.blockStartUntilAlive = true; // don't allow start until alive again
+            vars.aliveStableTicks = 0;
+        }
     }
-}
 
-void HandleHardRestart()
-{
+    // 4b) HARD map restart: timer decreased while still in gameplay (reset even at 1–2s)
     if (current.menu_state == 0 && current.timer < old.timer)
     {
         // Immediate LiveSplit reset to 0.00
         vars.timerModel.Reset();
 
         // Clear local state for a fresh attempt
-        ClearLocalState();
+        vars.timer_started = false;
+        vars.is_paused = false;
+        vars.hasStoppedOnce = false;
+        vars.did_reset = true;
+
+        vars.pauseHold = vars.unpauseHold = 0;
+        vars.stallTicks = vars.resumeTicks = 0;
+        vars.stallPauseActive = false;
+        vars.freshGameConfirmTicks = 0;
 
         // If restart followed a death, start is still gated by blockStartUntilAlive.
     }
-}
 
-void HandleFreshGameReset()
-{
+    // 5) Fresh-game queued reset logic — kept for menu-based reloads only
     if (!vars.timer_started && vars.hasStoppedOnce &&
         !vars.pendingReset && !vars.did_reset &&
         current.menu_state == 0 && current.timer <= vars.T_RESET_SMALL)
@@ -304,12 +265,12 @@ void HandleFreshGameReset()
         if (!vars.timer_started)
             vars.freshGameConfirmTicks = 0;
     }
-}
 
-void UpdatePauseStrippedClock()
-{
+    // 6) Pause-stripped clock
     if (!vars.is_paused)
         vars.timer_value = current.timer - vars.timer_pause_length;
     else
         vars.timer_pause_length = current.timer - vars.timer_value;
+
+    return true;
 }
