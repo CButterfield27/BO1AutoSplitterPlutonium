@@ -127,87 +127,73 @@ reset
     return false;
 }
 
-// Update — pause/unpause, stop on death/menu, HARD reset on map restart, arm resets
-update
+// 1) Debounced pause/unpause from explicit pause flag (>0 = paused)
+bool handlePauseToggle(bool toggledThisTick)
 {
-    bool toggledThisTick = false;
+    if (!vars.timer_started)
+        return toggledThisTick;
 
-    // 0) Track alive stability to clear start-block after death
-    if (vars.AliveVals.Contains(current.dead))
+    bool gameIsPaused = (current.game_paused > 0);
+
+    if (gameIsPaused) { vars.pauseHold++;  vars.unpauseHold = 0; }
+    else              { vars.unpauseHold++; vars.pauseHold  = 0; }
+
+    if (!vars.is_paused && vars.pauseHold >= vars.PauseConfirmTicks)
     {
-        vars.aliveStableTicks++;
-        if (vars.blockStartUntilAlive && vars.aliveStableTicks >= vars.AliveConfirmTicks)
-            vars.blockStartUntilAlive = false; // allow future starts again
+        vars.timerModel.Pause(); // ON
+        vars.is_paused = true;
+        vars.stallPauseActive = false;
+        vars.stallTicks = vars.resumeTicks = 0;
+        toggledThisTick = true;
     }
-    else
+
+    if (!toggledThisTick && vars.is_paused && !vars.stallPauseActive &&
+        vars.unpauseHold >= vars.UnpauseConfirmTicks)
     {
-        vars.aliveStableTicks = 0;
+        vars.timerModel.Pause(); // OFF
+        vars.is_paused = false;
+        toggledThisTick = true;
     }
 
-    // 1) Debounced pause/unpause from explicit pause flag (>0 = paused)
-    if (vars.timer_started)
+    return toggledThisTick;
+}
+
+// 2) Stall-based pause (off unless enabled)
+bool handleStallPause(bool toggledThisTick)
+{
+    if (!(vars.UseStallPause && vars.timer_started && !toggledThisTick && (current.game_paused == 0)))
+        return toggledThisTick;
+
+    if (current.timer <= old.timer) vars.stallTicks++; else { vars.stallTicks = 0; vars.resumeTicks = 0; }
+
+    if (!vars.is_paused && vars.stallTicks >= vars.T_TIMER_STALL_TICKS)
     {
-        bool gameIsPaused = (current.game_paused > 0);
+        vars.timerModel.Pause(); // ON
+        vars.is_paused = true;
+        vars.stallPauseActive = true;
+        vars.resumeTicks = 0;
+        return true;
+    }
 
-        if (gameIsPaused) { vars.pauseHold++;  vars.unpauseHold = 0; }
-        else              { vars.unpauseHold++; vars.pauseHold  = 0; }
-
-        if (!vars.is_paused && vars.pauseHold >= vars.PauseConfirmTicks)
-        {
-            vars.timerModel.Pause(); // ON
-            vars.is_paused = true;
-            vars.stallPauseActive = false;
-            vars.stallTicks = vars.resumeTicks = 0;
-            toggledThisTick = true;
-        }
-
-        if (!toggledThisTick && vars.is_paused && !vars.stallPauseActive &&
-            vars.unpauseHold >= vars.UnpauseConfirmTicks)
+    if (vars.is_paused && vars.stallPauseActive && current.timer > old.timer)
+    {
+        vars.resumeTicks++;
+        if (vars.resumeTicks >= vars.T_RESUME_TICKS)
         {
             vars.timerModel.Pause(); // OFF
             vars.is_paused = false;
-            toggledThisTick = true;
+            vars.stallPauseActive = false;
+            vars.stallTicks = vars.resumeTicks = 0;
+            return true;
         }
     }
 
-    // 2) stall-based pause (off unless enabled)
-    if (vars.UseStallPause && vars.timer_started && !toggledThisTick && (current.game_paused == 0))
-    {
-        if (current.timer <= old.timer) vars.stallTicks++; else { vars.stallTicks = 0; vars.resumeTicks = 0; }
+    return toggledThisTick;
+}
 
-        if (!vars.is_paused && vars.stallTicks >= vars.T_TIMER_STALL_TICKS)
-        {
-            vars.timerModel.Pause(); // ON
-            vars.is_paused = true;
-            vars.stallPauseActive = true;
-            vars.resumeTicks = 0;
-            toggledThisTick = true;
-        }
-
-        if (!toggledThisTick && vars.is_paused && vars.stallPauseActive && current.timer > old.timer)
-        {
-            vars.resumeTicks++;
-            if (vars.resumeTicks >= vars.T_RESUME_TICKS)
-            {
-                vars.timerModel.Pause(); // OFF
-                vars.is_paused = false;
-                vars.stallPauseActive = false;
-                vars.stallTicks = vars.resumeTicks = 0;
-            }
-        }
-    }
-
-    // 3) Stop on leaving gameplay (menu_state != 0) → pause + queued reset
-    if (vars.timer_started && current.menu_state != 0)
-    {
-        if (!vars.is_paused) { vars.timerModel.Pause(); vars.is_paused = true; } // freeze immediately
-        vars.timer_started = false;
-        vars.hasStoppedOnce = true;
-        vars.pendingReset = true;   // reset via reset{} next tick
-        vars.pauseHold = vars.unpauseHold = 0;
-    }
-
-    // 4) Stop on death → pause + queued reset; block starts until alive confirmed
+// 4) Stop on death → pause + queued reset; block starts until alive confirmed
+void checkDeathReset()
+{
     if (vars.timer_started)
     {
         bool isDeadNow = vars.DeadVals.Contains(current.dead);
@@ -226,6 +212,39 @@ update
             vars.aliveStableTicks = 0;
         }
     }
+}
+
+// Update — pause/unpause, stop on death/menu, HARD reset on map restart, arm resets
+update
+{
+    // 0) Track alive stability to clear start-block after death
+    if (vars.AliveVals.Contains(current.dead))
+    {
+        vars.aliveStableTicks++;
+        if (vars.blockStartUntilAlive && vars.aliveStableTicks >= vars.AliveConfirmTicks)
+            vars.blockStartUntilAlive = false; // allow future starts again
+    }
+    else
+    {
+        vars.aliveStableTicks = 0;
+    }
+
+    bool toggledThisTick = false;
+    toggledThisTick = handlePauseToggle(toggledThisTick);
+    toggledThisTick = handleStallPause(toggledThisTick);
+
+    // 3) Stop on leaving gameplay (menu_state != 0) → pause + queued reset
+    if (vars.timer_started && current.menu_state != 0)
+    {
+        if (!vars.is_paused) { vars.timerModel.Pause(); vars.is_paused = true; } // freeze immediately
+        vars.timer_started = false;
+        vars.hasStoppedOnce = true;
+        vars.pendingReset = true;   // reset via reset{} next tick
+        vars.pauseHold = vars.unpauseHold = 0;
+    }
+
+    // 4) Stop on death → pause + queued reset; block starts until alive confirmed
+    checkDeathReset();
 
     // 4b) HARD map restart: timer decreased while still in gameplay (reset even at 1–2s)
     if (current.menu_state == 0 && current.timer < old.timer)
