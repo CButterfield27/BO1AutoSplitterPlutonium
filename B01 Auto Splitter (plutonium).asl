@@ -78,9 +78,9 @@ startup
 
     // ---- Map alive/death codes ----
     // Alive values across maps
-    vars.AliveVals = new List<int> { 0, 7, 129 };
+    vars.AliveVals = new HashSet<int> { 0, 7, 129 };
     // Dead values across maps
-    vars.DeadVals  = new List<int> { 5, 25, 26 };
+    vars.DeadVals  = new HashSet<int> { 5, 25, 26 };
 }
 
 // Start — only when alive, in gameplay, and timer is moving
