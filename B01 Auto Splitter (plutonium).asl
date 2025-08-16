@@ -6,16 +6,26 @@
 //   Verrückt:      Alive=7,  Dead=25
 //   Der Riese:     Alive=129,Dead=26
 //
-// menu_state: 0 = playing, 99 = main menu (treat any != 0 as menu/loading)
+// menu_state values:
+//   MENU_STATE_PLAYING = 0
+//   MENU_STATE_MAIN    = 99
 // timer: ~20 units/sec, resets near 0 (map restart makes it drop/reset)
 // game_paused: > 0 = paused, 0 = playing
 
+const int MENU_STATE_PLAYING = 0;
+const int MENU_STATE_MAIN    = 99;
+
+const int MENU_STATE_ADDR  = 0x7CB530;
+const int TIMER_ADDR       = 0x168A37C;
+const int GAME_PAUSED_ADDR = 0x216BFD0;
+const int DEAD_ADDR        = 0x1656C38;
+
 state("plutonium-bootstrapper-win32")
 {
-    int  menu_state  : 0x7CB530;
-    int  timer       : 0x168A37C;
-    int  game_paused : 0x216BFD0;
-    int  dead        : 0x1656C38;
+    int  menu_state  : MENU_STATE_ADDR;
+    int  timer       : TIMER_ADDR;
+    int  game_paused : GAME_PAUSED_ADDR;
+    int  dead        : DEAD_ADDR;
 }
 
 init { refreshRate = 20; }
@@ -78,7 +88,7 @@ start
 {
     if (vars.pendingReset) return false;                       // don't start while a reset is queued
     if (vars.blockStartUntilAlive || !vars.AliveVals.Contains(current.dead)) return false; // must be alive
-    if (current.menu_state != 0) return false;                // must be in gameplay
+    if (current.menu_state != MENU_STATE_PLAYING) return false; // must be in gameplay
 
     if (current.timer > old.timer && current.timer >= vars.T_START_THRESHOLD)
     {
@@ -121,7 +131,7 @@ reset
         return true;
     }
 
-    if (current.menu_state != 0 || current.timer > vars.T_RESET_SMALL)
+    if (current.menu_state != MENU_STATE_PLAYING || current.timer > vars.T_RESET_SMALL)
         vars.did_reset = false;
 
     return false;
@@ -197,8 +207,8 @@ update
         }
     }
 
-    // 3) Stop on leaving gameplay (menu_state != 0) → pause + queued reset
-    if (vars.timer_started && current.menu_state != 0)
+    // 3) Stop on leaving gameplay (menu_state != MENU_STATE_PLAYING) → pause + queued reset
+    if (vars.timer_started && current.menu_state != MENU_STATE_PLAYING)
     {
         if (!vars.is_paused) { vars.timerModel.Pause(); vars.is_paused = true; } // freeze immediately
         vars.timer_started = false;
@@ -228,7 +238,7 @@ update
     }
 
     // 4b) HARD map restart: timer decreased while still in gameplay (reset even at 1–2s)
-    if (current.menu_state == 0 && current.timer < old.timer)
+    if (current.menu_state == MENU_STATE_PLAYING && current.timer < old.timer)
     {
         // Immediate LiveSplit reset to 0.00
         vars.timerModel.Reset();
@@ -250,7 +260,7 @@ update
     // 5) Fresh-game queued reset logic — kept for menu-based reloads only
     if (!vars.timer_started && vars.hasStoppedOnce &&
         !vars.pendingReset && !vars.did_reset &&
-        current.menu_state == 0 && current.timer <= vars.T_RESET_SMALL)
+        current.menu_state == MENU_STATE_PLAYING && current.timer <= vars.T_RESET_SMALL)
     {
         vars.freshGameConfirmTicks++;
         if (vars.freshGameConfirmTicks >= vars.T_RESET_CONFIRM_TICKS)
@@ -260,7 +270,7 @@ update
             vars.freshGameConfirmTicks = 0;
         }
     }
-    else if (current.timer > vars.T_RESET_SMALL || current.menu_state != 0 || vars.pendingReset || vars.did_reset)
+    else if (current.timer > vars.T_RESET_SMALL || current.menu_state != MENU_STATE_PLAYING || vars.pendingReset || vars.did_reset)
     {
         if (!vars.timer_started)
             vars.freshGameConfirmTicks = 0;
