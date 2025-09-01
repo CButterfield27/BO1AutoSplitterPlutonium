@@ -72,10 +72,14 @@ init
 
   // ---------- GT1 Manual Round Split Settings ----------
   // Users can edit the list below to choose which rounds to split on.
+  // Default placeholders:
   //   2 (sanity check), 5, 10, 15, 20
-  // (Optional) Add more rounds by appending values to the list, e.g.:
   vars.gt1_split_rounds = new List<int> { 2, 5, 10, 15, 20 };
 
+  // (Optional) Add more rounds by appending values to the list, e.g.:
+  // vars.gt1_split_rounds.Add(25);
+  // vars.gt1_split_rounds.Add(30);
+  //
   // Internal: rounds that have already split this run (cleared on Reset/Start).
   vars.gt1_split_done = new List<int>();
 

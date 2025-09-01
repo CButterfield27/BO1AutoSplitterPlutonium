@@ -1,10 +1,10 @@
 ﻿<?xml version="1.0" encoding="UTF-8"?>
 <Layout version="1.6.1">
   <Mode>Vertical</Mode>
-  <X>2240</X>
-  <Y>75</Y>
-  <VerticalWidth>286</VerticalWidth>
-  <VerticalHeight>43</VerticalHeight>
+  <X>2243</X>
+  <Y>89</Y>
+  <VerticalWidth>262</VerticalWidth>
+  <VerticalHeight>57</VerticalHeight>
   <HorizontalWidth>225</HorizontalWidth>
   <HorizontalHeight>45</HorizontalHeight>
   <Settings>
@@ -61,7 +61,7 @@
       <Path>LiveSplit.ScriptableAutoSplit.dll</Path>
       <Settings>
         <Version>1.5</Version>
-        <ScriptPath>C:\Users\Const\Desktop\Stuff\Gaming\B01 Auto Splitter\B01 Auto Splitter (plutonium).asl</ScriptPath>
+        <ScriptPath>C:\Users\Const\Documents\LiveSplit\BO1\B01 Auto Splitter (plutonium).asl</ScriptPath>
         <Start>True</Start>
         <Reset>True</Reset>
         <Split>True</Split>
